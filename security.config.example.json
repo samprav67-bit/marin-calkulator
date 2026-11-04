@@ -1,0 +1,11 @@
+{
+  "appName": "Security",
+  "authMode": "both",
+  "betaMode": true,
+
+  "smtpHost": "smtp.gmail.com",
+  "smtpPort": 465,
+  "smtpUser": "ваш.адрес@gmail.com",
+  "smtpPass": "пароль_приложения_google_16_символов",
+  "smtpFromName": "Security"
+}

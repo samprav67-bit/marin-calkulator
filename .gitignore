@@ -1,0 +1,7 @@
+data/
+dist/
+release/
+node_modules/
+security.config.json
+*.log
+.DS_Store

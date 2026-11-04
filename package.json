@@ -1,0 +1,28 @@
+{
+  "name": "security-messenger",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Security — шифрованный мессенджер: E2E-шифрование, звонки, файлы и голосовые сообщения",
+  "main": "server.js",
+  "bin": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build:exe": "pkg . --targets node22-win-x64 --output dist/security.exe"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*"
+    ],
+    "targets": [
+      "node22-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.5.0"
+  }
+}
