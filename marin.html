@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>jaja monkey — Калькулятор</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;600;800;900&display=swap');
+
+  :root {
+    --bg: #050505;
+    --surface: rgba(17, 17, 17, 0.88);
+    --surface-alt: rgba(30, 30, 30, 0.95);
+    --border: #333333;
+    --border-light: #444;
+    --text: #a0a0a0;
+    --text-bright: #e0e0e0;
+    --accent: #cc0000; 
+    --accent-hover: #ff1a1a;
+    --accent-glow: rgba(204, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg);
+    
+    /* Твой фон */
+    background-image: url('bg.jpg');
+    background-size: cover;
+    background-position: center 20%;
+    background-attachment: fixed;
+    
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Затемняющий слой (градиент для лучшей читаемости) */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.8) 100%);
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* Кастомный скроллбар в стиле хоррора */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* Шапка */
+  .site-header {
+    border-bottom: 1px solid var(--border);
+    background: rgba(5, 5, 5, 0.8);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 0 20px;
+  }
+  .header-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    height: 70px;
+  }
+  .logo-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .logo-link .brand-jaja { color: var(--accent); text-shadow: 0 0 10px var(--accent-glow); }
+  .logo-link .brand-monkey { color: var(--text-bright); }
+  .logo-link .monkey-emoji { font-size: 24px; filter: grayscale(1) contrast(2); }
+
+  /* Контейнер */
+  .page-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+  .hero-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: normal;
+    color: var(--text-bright);
+    margin: 0 0 10px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(255,255,255,0.2), 0 4px 10px rgba(0,0,0,0.8);
+  }
+  .hero-title span { color: var(--accent); }
+  .hero-subtitle {
+    text-align: center;
+    color: #ccc;
+    font-size: 14px;
+    margin: 0 0 40px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  }
+
+  /* Карточка */
+  .calc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.9), inset 0 0 0 1px rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    position: relative;
+  }
+  
+  .calc-card::before, .calc-card::after {
+    content: '';
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border: 2px solid var(--accent);
+    transition: all 0.3s;
+  }
+  .calc-card::before { top: -1px; left: -1px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+  .calc-card::after { bottom: -1px; right: -1px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+
+  /* Вкладки */
+  .ch-tabs-nav {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ch-tab-btn {
+    background: transparent;
+    border: none;
+    padding: 12px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #888;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    font-family: 'Inter', sans-serif;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .ch-tab-btn:hover { color: var(--text-bright); }
+  .ch-tab-btn.active {
+    color: var(--text-bright);
+    border-bottom-color: var(--accent);
+    background: linear-gradient(to top, rgba(204,0,0,0.15), transparent);
+  }
+  .ch-tab-content { display: none; }
+  .ch-tab-content.active { display: block; animation: fadeIn 0.4s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; filter: blur(5px); }
+    to { opacity: 1; filter: blur(0); }
+  }
+
+  /* --- ВКЛАДКА 1: СТОЛБИК --- */
+  .ch-column-entry-card {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 24px;
+    border-radius: 4px;
+  }
+  .ch-column-entry-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .ch-column-entry-field { flex: 1 1 140px; }
+  .ch-column-entry-input {
+    width: 100%;
+    padding: 16px;
+    font-size: 28px;
+    font-family: 'Share Tech Mono', monospace;
+    text-align: center;
+    color: var(--text-bright);
+    background: rgba(0,0,0,0.8);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .ch-column-entry-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+  }
+  
+  .ch-column-operator-pad {
+    display: flex;
+    gap: 4px;
+    background: rgba(0,0,0,0.8);
+    border: 1px solid var(--border);
+    padding: 4px;
+  }
+  .ch-column-operator-btn {
+    width: 48px;
+    height: 48px;
+    border: none;
+    background: transparent;
+    color: #888;
+    font-size: 24px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Share Tech Mono', monospace;
+    line-height: 1;
+  }
+  .ch-column-operator-btn:hover { color: var(--text-bright); background: rgba(255,255,255,0.05); }
+  .ch-column-operator-btn.is-active {
+    color: #fff;
+    background: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+  }
+  .ch-column-entry-hint {
+    margin-top: 16px;
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* --- ВКЛАДКА 2: ФОРМУЛЫ --- */
+  .formula-calc-input {
+    width: 100%;
+    padding: 18px;
+    font-size: 22px;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-bright);
+    background: rgba(0,0,0,0.8);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    outline: none;
+    margin-bottom: 16px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .formula-calc-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 15px var(--accent-glow);
+  }
+  
+  .formula-keypad {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .formula-btn {
+    padding: 14px 8px;
+    font-size: 16px;
+    font-family: 'Share Tech Mono', monospace;
+    background: var(--surface-alt);
+    color: var(--text-bright);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .formula-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+  .formula-btn:active {
+    transform: scale(0.95);
+  }
+  .formula-btn.action-btn {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .formula-btn.action-btn:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+  .formula-hint {
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  /* --- ОБЩИЕ КНОПКИ И РЕЗУЛЬТАТЫ --- */
+  .ch-calculate-btn {
+    width: 100%;
+    padding: 20px;
+    font-size: 18px;
+    font-weight: 800;
+    font-family: 'Share Tech Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #fff;
+    background: rgba(26, 26, 26, 0.9);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .ch-calculate-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 30px var(--accent-glow);
+    text-shadow: 0 0 5px rgba(255,255,255,0.8);
+  }
+  .ch-calculate-btn:active { transform: scale(0.99); }
+
+  #calcResult, #formulaResult { margin-top: 30px; display: none; }
+  #calcResult.show-result, #formulaResult.show-result { display: block; }
+  
+  .ch-column-result-shell {
+    background: rgba(0,0,0,0.9);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 24px;
+    position: relative;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .ch-column-result-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 12px;
+  }
+  .ch-column-result-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    color: var(--text-bright);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  
+  .ch-column-board-card {
+    background: rgba(26, 26, 26, 0.9);
+    border: 1px solid var(--border);
+    padding: 20px;
+    overflow-x: auto;
+    margin-bottom: 20px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+  }
+  .ch-column-board {
+    display: inline-block;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 22px;
+    line-height: 1.6;
+    color: var(--text-bright);
+    min-width: max-content;
+  }
+  .ch-column-board-line { white-space: pre; }
+
+  .ch-column-division-notes { display: grid; gap: 10px; }
+  .ch-column-division-note {
+    background: rgba(17, 17, 17, 0.8);
+    border: 1px solid #222;
+    padding: 12px 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #aaa;
+  }
+  .ch-column-division-note::before {
+    content: '> ';
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .ch-column-answer-line {
+    margin-top: 24px;
+    padding: 20px;
+    background: rgba(204, 0, 0, 0.1);
+    border: 1px solid var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 0 10px var(--accent-glow);
+    word-break: break-word;
+    position: relative;
+  }
+
+  /* --- ИСТОРИЯ --- */
+  .ch-history-wrapper {
+    margin-top: 40px;
+    border-top: 1px solid var(--border);
+    padding-top: 30px;
+  }
+  .ch-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .ch-history-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    color: var(--text-bright);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+  .ch-clear-history {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: #888;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 4px;
+  }
+  .ch-clear-history:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .ch-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ch-history-item {
+    background: var(--surface-alt);
+    border: 1px solid #222;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-radius: 4px;
+  }
+  .ch-history-item .hi-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    background: rgba(204,0,0,0.15);
+    padding: 4px 8px;
+    border-radius: 2px;
+  }
+  .ch-history-item .hi-result {
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-bright);
+    font-size: 16px;
+  }
+  .ch-history-empty {
+    color: #777;
+    padding: 20px;
+    text-align: center;
+    border: 1px dashed var(--border);
+    font-style: italic;
+  }
+
+  /* Подвал */
+  .site-footer {
+    text-align: center;
+    padding: 40px 20px;
+    color: #888;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  }
+
+  @media (max-width: 640px) {
+    .calc-card { padding: 20px; }
+    .ch-column-entry-row { flex-direction: column; }
+    .ch-column-operator-pad { justify-content: center; width: 100%; }
+    .ch-column-operator-btn { flex: 1; }
+    .ch-column-board { font-size: 18px; }
+    .ch-column-answer-line { font-size: 16px; }
+    .formula-keypad { grid-template-columns: repeat(4, 1fr); }
+    .ch-tabs-nav { flex-wrap: wrap; }
+    .ch-tab-btn { flex: 1 1 auto; text-align: center; padding: 12px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="#" class="logo-link">
+      <span class="monkey-emoji">🐒</span>
+      <span><span class="brand-jaja">jaja</span> <span class="brand-monkey">monkey</span></span>
+    </a>
+  </div>
+</header>
+
+<div class="page-wrapper">
+  <h1 class="hero-title">
+    <span>jaja monkey</span><br>Калькулятор
+  </h1>
+  <p class="hero-subtitle">Решение столбиком • 死の計算 • Мрак</p>
+
+  <div class="calc-card">
+    <div class="ch-tabs-nav" role="tablist">
+      <button class="ch-tab-btn active" data-tab="tab-calc">Столбик</button>
+      <button class="ch-tab-btn" data-tab="tab-formula">Формулы</button>
+      <button class="ch-tab-btn" data-tab="tab-guide">Инструкция</button>
+    </div>
+
+    <!-- Вкладка 1: Калькулятор в столбик -->
+    <div class="ch-tab-content active" id="tab-calc" role="tabpanel">
+      <div class="ch-column-entry-card">
+        <div class="ch-column-entry-row">
+          <div class="ch-column-entry-field">
+            <input type="text" id="numA" class="ch-column-entry-input" value="56" placeholder="A" aria-label="Первое число">
+          </div>
+          <div class="ch-column-operator-pad" role="group">
+            <button type="button" class="ch-column-operator-btn is-active" data-op="add" aria-label="Сложение">+</button>
+            <button type="button" class="ch-column-operator-btn" data-op="sub" aria-label="Вычитание">−</button>
+            <button type="button" class="ch-column-operator-btn" data-op="mul" aria-label="Умножение">×</button>
+            <button type="button" class="ch-column-operator-btn" data-op="div" aria-label="Деление">÷</button>
+          </div>
+          <div class="ch-column-entry-field">
+            <input type="text" id="numB" class="ch-column-entry-input" value="56" placeholder="B" aria-label="Второе число">
+          </div>
+        </div>
+        <div class="ch-column-entry-hint" id="entryHint">Сервис выровняет числа и покажет сложение столбиком по шагам.</div>
+      </div>
+
+      <button type="button" class="ch-calculate-btn" id="calcBtn">Вычислить</button>
+
+      <div id="calcResult" role="status" aria-live="polite"></div>
+    </div>
+
+    <!-- Вкладка 2: Калькулятор формул -->
+    <div class="ch-tab-content" id="tab-formula" role="tabpanel">
+      <input type="text" id="formulaInput" class="formula-calc-input" placeholder="Например: 2 + 2 * 2 или sin(pi/2)" value="2 + 2 * 2" aria-label="Математическое выражение">
+      
+      <div class="formula-keypad">
+        <button type="button" class="formula-btn action-btn" onclick="addToFormula('C')">C</button>
+        <button type="button" class="formula-btn action-btn" onclick="addToFormula('⌫')">⌫</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('(')">(</button>
+        <button type="button" class="formula-btn" onclick="addToFormula(')')">)</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('^')">^</button>
+        
+        <button type="button" class="formula-btn" onclick="addToFormula('sin(')">sin</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('cos(')">cos</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('tan(')">tan</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('log(')">log</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('√(')">√</button>
+        
+        <button type="button" class="formula-btn" onclick="addToFormula('π')">π</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('e')">e</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('7')">7</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('8')">8</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('9')">9</button>
+        
+        <button type="button" class="formula-btn" onclick="addToFormula('4')">4</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('5')">5</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('6')">6</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('*')">*</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('/')">/</button>
+
+        <button type="button" class="formula-btn" onclick="addToFormula('1')">1</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('2')">2</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('3')">3</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('+')">+</button>
+        <button type="button" class="formula-btn" onclick="addToFormula('-')">-</button>
+      </div>
+      
+      <div class="formula-hint">
+        Поддерживаются: +, -, *, /, ^ (степень), скобки.<br>
+        Функции: sin, cos, tan, log (нат. логарифм), √ (корень).<br>
+        Углы задаются в радианах. Используй <b>π</b> для точного числа Пи.
+      </div>
+
+      <button type="button" class="ch-calculate-btn" id="formulaCalcBtn">Решить выражение</button>
+      <div id="formulaResult" role="status" aria-live="polite"></div>
+    </div>
+
+    <!-- Вкладка 3: Инструкция -->
+    <div class="ch-tab-content" id="tab-guide" role="tabpanel">
+      <div class="ch-step-card">
+        <div class="step-num">01</div>
+        <div class="step-text">
+          <strong>Калькулятор в столбик</strong>
+          <p>В первой вкладке вы можете сложить, вычесть, умножить или разделить два числа и увидеть пошаговое решение.</p>
+        </div>
+      </div>
+      <div class="ch-step-card">
+        <div class="step-num">02</div>
+        <div class="step-text">
+          <strong>Калькулятор формул</strong>
+          <p>Во второй вкладке вводите сложные математические выражения со скобками, корнями и тригонометрией. Используйте удобную клавиатуру ниже поля ввода.</p>
+        </div>
+      </div>
+      <div class="ch-step-card">
+        <div class="step-num">03</div>
+        <div class="step-text">
+          <strong>Сохранение истории</strong>
+          <p>Все твои вычисления сохраняются в браузере. Даже если ты закроешь вкладку и вернешься позже, история будет на месте.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- История -->
+    <div class="ch-history-wrapper">
+      <div class="ch-history-header">
+        <div class="ch-history-title">> Лог вычислений</div>
+        <button class="ch-clear-history" id="clearHistoryBtn">Очистить</button>
+      </div>
+      <ul class="ch-history-list" id="historyList">
+        <li class="ch-history-empty" id="historyEmpty">Данные отсутствуют...</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  jaja monkey system // 2026
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  // ==========================================
+  //  ЛОГИКА ВКЛАДКИ 1: КАЛЬКУЛЯТОР В СТОЛБИК
+  // ==========================================
+
+  function parseNum(raw) {
+    var s = String(raw === null || raw === undefined ? '' : raw)
+      .replace(/[\s\u00A0\u202F]/g, '')
+      .replace(/[−–—]/g, '-')
+      .replace(',', '.');
+    if (!s) return { error: 'Введите число.' };
+    if (!/^-?\d+(\.\d+)?$/.test(s)) return { error: 'Ошибка формата: «' + raw + '».' };
+    return { value: s };
+  }
+
+  function toDecimal(raw) {
+    var r = parseNum(raw);
+    if (r.error) return r;
+    var s = r.value;
+    var sign = 1;
+    if (s.charAt(0) === '-') { sign = -1; s = s.slice(1); }
+    var parts = s.split('.');
+    var intPart = parts[0] || '0';
+    var fracPart = parts[1] || '';
+    fracPart = fracPart.replace(/0+$/, '');
+    var digits = (intPart + fracPart).replace(/^0+(?=\d)/, '') || '0';
+    if (digits === '0') { sign = 1; fracPart = ''; }
+    return { sign: sign, digits: digits, scale: fracPart.length };
+  }
+
+  function stripZeros(d) { return String(d).replace(/^0+(?=\d)/, '') || '0'; }
+  function padZeros(d, n) { d = stripZeros(d); while (d.length < n) d = '0' + d; return d; }
+
+  function addDigits(a, b) {
+    a = stripZeros(a); b = stripZeros(b);
+    var res = '', carry = 0, i = a.length - 1, j = b.length - 1;
+    while (i >= 0 || j >= 0 || carry) {
+      var da = i >= 0 ? +a[i--] : 0, db = j >= 0 ? +b[j--] : 0, sum = da + db + carry;
+      res = (sum % 10) + res; carry = Math.floor(sum / 10);
+    }
+    return stripZeros(res);
+  }
+
+  function subDigits(a, b) {
+    a = stripZeros(a); b = stripZeros(b);
+    var res = '', borrow = 0, i = a.length - 1, j = b.length - 1;
+    while (i >= 0) {
+      var da = +a[i--] - borrow, db = j >= 0 ? +b[j--] : 0;
+      if (da < db) { da += 10; borrow = 1; } else borrow = 0;
+      res = (da - db) + res;
+    }
+    return stripZeros(res);
+  }
+
+  function cmpDigits(a, b) {
+    a = stripZeros(a); b = stripZeros(b);
+    if (a.length !== b.length) return a.length > b.length ? 1 : -1;
+    if (a === b) return 0;
+    return a > b ? 1 : -1;
+  }
+
+  function mulDigitByDigit(d, digit) {
+    d = stripZeros(d); digit = +digit;
+    if (digit === 0) return '0';
+    var res = '', carry = 0;
+    for (var i = d.length - 1; i >= 0; i--) {
+      var p = +d[i] * digit + carry;
+      res = (p % 10) + res; carry = Math.floor(p / 10);
+    }
+    while (carry) { res = (carry % 10) + res; carry = Math.floor(carry / 10); }
+    return stripZeros(res);
+  }
+
+  function mulDigits(a, b) {
+    a = stripZeros(a); b = stripZeros(b);
+    if (a === '0' || b === '0') return '0';
+    var total = '0';
+    for (var j = b.length - 1; j >= 0; j--) {
+      var partial = mulDigitByDigit(a, b[j]);
+      partial += '0'.repeat(b.length - 1 - j);
+      total = addDigits(total, partial);
+    }
+    return stripZeros(total);
+  }
+
+  function formatNumber(sign, digits, scale) {
+    digits = stripZeros(digits);
+    if (scale > 0) {
+      digits = padZeros(digits, scale + 1);
+      var intPart = digits.slice(0, digits.length - scale);
+      var frac = digits.slice(digits.length - scale);
+      var out = intPart + ',' + frac;
+      return (sign < 0 && digits !== '0' ? '-' : '') + out;
+    }
+    return (sign < 0 && digits !== '0' ? '-' : '') + digits;
+  }
+
+  function calcAdd(A, B) {
+    var scale = Math.max(A.scale, B.scale);
+    var a = A.digits + '0'.repeat(scale - A.scale);
+    var b = B.digits + '0'.repeat(scale - B.scale);
+    var sign = A.sign, resDigits, notes = [];
+    
+    if (A.sign === B.sign) {
+      resDigits = addDigits(a, b);
+      notes.push('Складываем числа справа налево.');
+      var aa = padZeros(a, Math.max(a.length, b.length)), bb = padZeros(b, Math.max(a.length, b.length)), carry = 0;
+      for (var i = aa.length - 1; i >= 0; i--) {
+        var da = +aa[i], db = +bb[i], s = da + db + carry;
+        notes.push(da + ' + ' + db + (carry ? ' + перенос ' + carry : '') + ' = ' + s + '. Записываем ' + (s % 10) + (s >= 10 ? ', переносим ' + Math.floor(s / 10) + '.' : '.'));
+        carry = Math.floor(s / 10);
+      }
+      if (carry) notes.push('Записываем перенос ' + carry + ' в старший разряд.');
+    } else {
+      var cmp = cmpDigits(a, b), big, small;
+      if (cmp >= 0) { big = a; small = b; sign = A.sign; }
+      else { big = b; small = a; sign = B.sign; }
+      resDigits = subDigits(big, small);
+      notes.push('Знаки разные, вычитаем меньший модуль из большего.');
+    }
+    var resObj = { sign: sign, digits: resDigits, scale: scale };
+    var alignedA = formatNumber(A.sign, A.digits + '0'.repeat(scale - A.scale), scale);
+    var alignedB = formatNumber(B.sign, B.digits + '0'.repeat(scale - B.scale), scale);
+    var resultText = formatNumber(resObj.sign, resObj.digits, resObj.scale);
+    return {
+      type: 'add', answer: resultText, notes: notes,
+      board: buildAddSubBoard(alignedA.replace('-', ''), alignedB.replace('-', ''), resultText.replace('-', ''), '+'),
+      expression: alignedA + ' + ' + (B.sign < 0 ? '(' + alignedB + ')' : alignedB),
+      answerText: resultText
+    };
+  }
+
+  function calcSub(A, B) {
+    var B2 = { sign: -B.sign, digits: B.digits, scale: B.scale };
+    if (B.digits === '0') B2.sign = 1;
+    var r = calcAdd(A, B2);
+    r.type = 'sub';
+    var scale = Math.max(A.scale, B.scale);
+    var alignedA = formatNumber(A.sign, A.digits + '0'.repeat(scale - A.scale), scale);
+    var alignedB = formatNumber(B.sign, B.digits + '0'.repeat(scale - B.scale), scale);
+    var resultText = r.answer;
+    r.expression = alignedA + ' − ' + (B.sign < 0 ? '(' + alignedB + ')' : alignedB);
+    r.board = buildAddSubBoard(alignedA.replace('-', ''), alignedB.replace('-', ''), resultText.replace('-', ''), '−');
+    return r;
+  }
+
+  function calcMul(A, B) {
+    var resDigits = mulDigits(A.digits, B.digits);
+    var scale = A.scale + B.scale, sign = (A.sign === B.sign) ? 1 : -1, notes = [];
+    notes.push('Умножаем числа как целые.');
+    var partials = [], bDigits = B.digits;
+    for (var j = bDigits.length - 1; j >= 0; j--) {
+      var d = +bDigits[j], partial = mulDigitByDigit(A.digits, d);
+      if (partial !== '0') partial += '0'.repeat(bDigits.length - 1 - j);
+      partials.push({ digit: d, value: partial });
+      notes.push(A.digits + ' × ' + d + (bDigits.length - 1 - j ? ' со сдвигом на ' + (bDigits.length - 1 - j) + ' поз.' : '') + ' = ' + partial + '.');
+    }
+    if (partials.length > 1) notes.push('Складываем частичные произведения.');
+    if (scale) notes.push('Отделяем запятой ' + scale + ' знак(а) справа. Ответ: ' + formatNumber(sign, resDigits, scale) + '.');
+    var alignedA = formatNumber(A.sign, A.digits, A.scale);
+    var alignedB = formatNumber(B.sign, B.digits, B.scale);
+    var resultText = formatNumber(sign, resDigits, scale);
+    return {
+      type: 'mul', answer: resultText, notes: notes,
+      expression: alignedA + ' × ' + (B.sign < 0 ? '(' + alignedB + ')' : alignedB),
+      board: buildMulBoard(A.digits, B.digits, resDigits, partials),
+      answerText: resultText
+    };
+  }
+
+  function calcDiv(A, B) {
+    if (B.digits === '0') return { error: 'Деление на ноль невозможно.' };
+    var scale = Math.max(A.scale, B.scale);
+    var dividend = A.digits + '0'.repeat(scale - A.scale);
+    var divisor = B.digits + '0'.repeat(scale - B.scale);
+    var sign = (A.sign === B.sign) ? 1 : -1;
+    var quotient = '', remainder = '0', steps = [];
+    for (var i = 0; i < dividend.length; i++) {
+      remainder = stripZeros(remainder + dividend[i]);
+      var qDigit = 0;
+      for (var d = 9; d >= 0; d--) {
+        if (cmpDigits(mulDigitByDigit(divisor, d), remainder) <= 0) { qDigit = d; break; }
+      }
+      var prod = mulDigitByDigit(divisor, qDigit);
+      var rem = subDigits(remainder, prod);
+      steps.push({ cur: remainder, prod: prod, rem: rem, q: qDigit });
+      quotient += qDigit;
+      remainder = rem;
+    }
+    var quotientInt = stripZeros(quotient), notes = [];
+    notes.push('Делим столбиком.');
+    steps.forEach(function (st) {
+      if (st.q === 0 && st.cur === st.rem) {
+        notes.push(st.cur + ' меньше ' + divisor + ', пишем 0 в частное.');
+      } else {
+        notes.push(st.cur + ' ÷ ' + divisor + ' = ' + st.q + ' (ост. ' + st.rem + ').');
+      }
+    });
+    notes.push('Деление завершено.');
+    var alignedA = formatNumber(A.sign, A.digits, A.scale);
+    var alignedB = formatNumber(B.sign, B.digits, B.scale);
+    var answer = (sign < 0 && quotientInt !== '0' ? '-' : '') + quotientInt;
+    return {
+      type: 'div', answer: answer, notes: notes,
+      expression: alignedA + ' : ' + (B.sign < 0 ? '(' + alignedB + ')' : alignedB),
+      board: buildDivBoard(dividend, divisor, quotient, steps),
+      answerText: answer
+    };
+  }
+
+  function buildAddSubBoard(a, b, res, op) {
+    var width = Math.max(a.length, b.length + 2, res.length), lines = [];
+    lines.push(padStart(a, width));
+    lines.push(op + ' ' + padStart(b, width - 2));
+    lines.push('─'.repeat(width));
+    lines.push(padStart(res, width));
+    return lines;
+  }
+
+  function buildMulBoard(a, b, res, partials) {
+    var width = Math.max(a.length, b.length + 2, res.length);
+    partials.forEach(function (p) { width = Math.max(width, p.value.length); });
+    var lines = [];
+    lines.push(padStart(a, width));
+    lines.push('× ' + padStart(b, width - 2));
+    lines.push('─'.repeat(width));
+    partials.forEach(function (p) { lines.push(padStart(p.value, width)); });
+    if (partials.length > 1) lines.push('─'.repeat(width));
+    lines.push(padStart(res, width));
+    return lines;
+  }
+
+  function buildDivBoard(dividend, divisor, quotient, steps) {
+    var lines = [], q = quotient.replace(/^0+(?=\d)/, '') || '0';
+    lines.push(dividend + ' │' + divisor);
+    lines.push(' '.repeat(dividend.length + 1) + '└' + '─'.repeat(Math.max(divisor.length, q.length)));
+    lines.push(' '.repeat(dividend.length + 2) + q);
+    steps.forEach(function (st) {
+      if (st.q === 0 && st.cur === st.rem) return;
+      if (st.cur !== '0' && st.prod !== '0') {
+        lines.push('  ' + st.cur);
+        lines.push('- ' + st.prod);
+        lines.push('  ' + '─'.repeat(Math.max(st.cur.length, st.prod.length)));
+        lines.push('  ' + st.rem);
+      }
+    });
+    return lines;
+  }
+
+  function padStart(s, n) {
+    s = String(s);
+    while (s.length < n) s = ' ' + s;
+    return s;
+  }
+
+  var resultEl = document.getElementById('calcResult');
+  var currentOp = 'add';
+
+  function renderResult(data) {
+    if (data.error) {
+      resultEl.innerHTML = '<div class="ch-column-answer-line" style="border-color:#e57373;background:rgba(255,235,238,0.1);color:#ff8a80;">> Ошибка: ' + data.error + '</div>';
+      resultEl.classList.add('show-result');
+      return;
+    }
+    var boardHtml = data.board.map(function (line) {
+      return '<div class="ch-column-board-line">' + escapeHtml(line) + '</div>';
+    }).join('');
+    var notesHtml = data.notes.map(function (n) {
+      return '<div class="ch-column-division-note">' + escapeHtml(n) + '</div>';
+    }).join('');
+    var html =
+      '<div class="ch-column-result-shell">' +
+        '<div class="ch-column-result-top">' +
+          '<span class="ch-column-result-title">> Анализ завершен</span>' +
+        '</div>' +
+        '<div class="ch-column-board-card">' +
+          '<div class="ch-column-board">' + boardHtml + '</div>' +
+        '</div>' +
+        '<div class="ch-column-division-notes">' + notesHtml + '</div>' +
+        '<div class="ch-column-answer-line" data-ch-preserve-literal="true">Ответ: ' + escapeHtml(data.expression) + ' = ' + escapeHtml(data.answerText) + '</div>' +
+      '</div>';
+    resultEl.innerHTML = html;
+    resultEl.classList.add('show-result');
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function calculate() {
+    var aRaw = document.getElementById('numA').value;
+    var bRaw = document.getElementById('numB').value;
+    var A = toDecimal(aRaw);
+    if (A.error) { renderResult({ error: A.error }); return; }
+    var B = toDecimal(bRaw);
+    if (B.error) { renderResult({ error: B.error }); return; }
+
+    var data;
+    switch (currentOp) {
+      case 'add': data = calcAdd(A, B); break;
+      case 'sub': data = calcSub(A, B); break;
+      case 'mul': data = calcMul(A, B); break;
+      case 'div': data = calcDiv(A, B); break;
+    }
+    if (data.error) { renderResult(data); return; }
+    renderResult(data);
+    addHistory(aRaw, bRaw, data.answerText, data.expression, currentOp);
+  }
+
+  // ==========================================
+  //  ЛОГИКА ВКЛАДКИ 2: КАЛЬКУЛЯТОР ФОРМУЛ
+  // ==========================================
+
+  function evaluateFormula(expr) {
+    // Замена символов
+    var jsExpr = expr
+      .replace(/π/g, 'Math.PI')
+      .replace(/√/g, 'Math.sqrt')
+      .replace(/(?<![a-zA-Z])e(?![a-zA-Z])/g, 'Math.E')
+      .replace(/sin\(/g, 'Math.sin(')
+      .replace(/cos\(/g, 'Math.cos(')
+      .replace(/tan\(/g, 'Math.tan(')
+      .replace(/log\(/g, 'Math.log(')
+      .replace(/\^/g, '**');
+
+    // Проверка на опасные символы (базовая защита)
+    if (/[^0-9+\-*/().\sMathPIEsincoaltgqr]/.test(jsExpr)) {
+       throw new Error('Недопустимые символы в выражении');
+    }
+
+    try {
+      var result = new Function('return ' + jsExpr)();
+      if (typeof result !== 'number' || isNaN(result) || !isFinite(result)) {
+        throw new Error('Результат не является числом');
+      }
+      return Math.round(result * 1e10) / 1e10; // Округление
+    } catch (e) {
+      throw new Error('Ошибка синтаксиса выражения');
+    }
+  }
+
+  var formulaInput = document.getElementById('formulaInput');
+  var formulaResult = document.getElementById('formulaResult');
+
+  window.addToFormula = function(text) {
+    var startPos = formulaInput.selectionStart;
+    var endPos = formulaInput.selectionEnd;
+    var currentVal = formulaInput.value;
+
+    if (text === 'C') {
+      formulaInput.value = '';
+    } else if (text === '⌫') {
+      if (startPos === endPos && startPos > 0) {
+        formulaInput.value = currentVal.substring(0, startPos - 1) + currentVal.substring(endPos);
+        formulaInput.selectionStart = formulaInput.selectionEnd = startPos - 1;
+      } else {
+        formulaInput.value = currentVal.substring(0, startPos) + currentVal.substring(endPos);
+        formulaInput.selectionStart = formulaInput.selectionEnd = startPos;
+      }
+    } else {
+      formulaInput.value = currentVal.substring(0, startPos) + text + currentVal.substring(endPos, currentVal.length);
+      formulaInput.selectionStart = formulaInput.selectionEnd = startPos + text.length;
+    }
+    formulaInput.focus();
+  };
+
+  document.getElementById('formulaCalcBtn').addEventListener('click', function() {
+    var expr = formulaInput.value.trim();
+    if (!expr) return;
+
+    try {
+      var res = evaluateFormula(expr);
+      formulaResult.innerHTML = '<div class="ch-column-result-shell" style="margin-top:0;">' +
+        '<div class="ch-column-answer-line" data-ch-preserve-literal="true">> ' + escapeHtml(expr) + ' = ' + res + '</div>' +
+        '</div>';
+      formulaResult.classList.add('show-result');
+      
+      addHistory('Формула', '', res, expr, 'formula');
+      
+    } catch (e) {
+      formulaResult.innerHTML = '<div class="ch-column-answer-line" style="border-color:#e57373;background:rgba(255,235,238,0.1);color:#ff8a80;">> Ошибка: ' + e.message + '</div>';
+      formulaResult.classList.add('show-result');
+    }
+  });
+
+  // ==========================================
+  //  ИСТОРИЯ (LocalStorage)
+  // ==========================================
+
+  var history = [];
+  var STORAGE_KEY = 'jaja_monkey_history_v1';
+
+  function loadHistory() {
+    try {
+      var stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        history = JSON.parse(stored);
+      }
+    } catch(e) {
+      history = [];
+    }
+    renderHistory();
+  }
+
+  function saveHistory() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    } catch(e) {}
+  }
+
+  function addHistory(a, b, answer, expr, op) {
+    var time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    history.unshift({ time: time, a: a, b: b, answer: answer, expr: expr, op: op });
+    if (history.length > 10) history.pop();
+    saveHistory();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    var list = document.getElementById('historyList');
+    if (history.length === 0) {
+      list.innerHTML = '<li class="ch-history-empty" id="historyEmpty">Данные отсутствуют...</li>';
+      return;
+    }
+    list.innerHTML = history.map(function (h) {
+      if (h.op === 'formula') {
+         return '<li class="ch-history-item">' +
+          '<span class="hi-time">' + h.time + '</span>' +
+          '<div class="hi-result">' + escapeHtml(h.expr) + ' = ' + escapeHtml(h.answer) + '</div>' +
+        '</li>';
+      } else {
+        var opSymbol = { add: '+', sub: '−', mul: '×', div: '÷' }[h.op];
+        return '<li class="ch-history-item">' +
+          '<span class="hi-time">' + h.time + '</span>' +
+          '<div class="hi-result">' + escapeHtml(h.a) + ' ' + opSymbol + ' ' + escapeHtml(h.b) + ' = ' + escapeHtml(h.answer) + '</div>' +
+        '</li>';
+      }
+    }).join('');
+  }
+
+  document.getElementById('clearHistoryBtn').addEventListener('click', function() {
+    history = [];
+    saveHistory();
+    renderHistory();
+  });
+
+  // ==========================================
+  //  ИНИЦИАЛИЗАЦИЯ И ОБРАБОТЧИКИ
+  // ==========================================
+
+  document.querySelectorAll('.ch-tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.ch-tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.ch-tab-content').forEach(function (c) { c.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  var opHints = {
+    add: 'Сервис выровняет числа и покажет сложение столбиком по шагам.',
+    sub: 'Из левого числа вычитается правое. Вычитание столбиком покажет каждый заём.',
+    mul: 'Частичные произведения и перенос запятой для десятичных чисел.',
+    div: 'Калькулятор покажет цифры частного и промежуточные остатки.'
+  };
+
+  document.querySelectorAll('.ch-column-operator-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.ch-column-operator-btn').forEach(function (b) {
+        b.classList.remove('is-active');
+      });
+      btn.classList.add('is-active');
+      currentOp = btn.dataset.op;
+      document.getElementById('entryHint').textContent = opHints[currentOp];
+      resultEl.classList.remove('show-result');
+      resultEl.innerHTML = '';
+    });
+  });
+
+  document.getElementById('calcBtn').addEventListener('click', calculate);
+  document.getElementById('numA').addEventListener('keydown', function (e) { if (e.key === 'Enter') calculate(); });
+  document.getElementById('numB').addEventListener('keydown', function (e) { if (e.key === 'Enter') calculate(); });
+  
+  formulaInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      document.getElementById('formulaCalcBtn').click();
+    }
+  });
+
+  // Загрузка истории при старте
+  loadHistory();
+
+})();
+</script>
+</body>
+</html>
