@@ -24,5 +24,8 @@
   },
   "devDependencies": {
     "@yao-pkg/pkg": "^6.5.0"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.2"
   }
 }

@@ -1,0 +1,10 @@
+data/
+dist/
+release/
+node_modules/
+security.config.json
+security.config.example.json
+.env*
+*.log
+.DS_Store
+.git/
