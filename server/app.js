@@ -5,7 +5,8 @@ const path = require('path');
 const crypto = require('crypto');
 const tls = require('tls');
 const readline = require('readline');
-const { db, save, FILES_DIR, AVATARS_DIR } = require('./store');
+const store = require('./store');
+const { db, save } = store;
 const { ROOT, PUBLIC_DIR, PACKAGED } = require('./paths');
 const realtime = require('./realtime');
 
@@ -73,7 +74,24 @@ function sendError(res, status, error, extra = {}) {
   sendJson(res, status, { error, ...extra });
 }
 
+function bodyBuffer(req) {
+  if (req.body === undefined || req.body === null) return null;
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (req.body instanceof Uint8Array) return Buffer.from(req.body);
+  if (typeof req.body === 'string') return Buffer.from(req.body, 'utf8');
+  return Buffer.from(JSON.stringify(req.body), 'utf8');
+}
+
 function readBody(req, limit) {
+  // Vercel Functions разбирают тело запроса до вызова обработчика.
+  const already = bodyBuffer(req);
+  if (already !== null) {
+    if (already.length > limit) {
+      return Promise.reject(Object.assign(new Error('too_large'), { status: 413 }));
+    }
+    return Promise.resolve(already);
+  }
+
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
@@ -456,8 +474,13 @@ function sessionUser(req, url) {
   if (!session) return null;
   const user = db.users[session.userId];
   if (!user) return null;
-  session.lastSeenAt = nowIso();
-  user.lastSeenAt = session.lastSeenAt;
+  const previous = Date.parse(session.lastSeenAt || '');
+  const stamp = nowIso();
+  session.lastSeenAt = stamp;
+  user.lastSeenAt = stamp;
+  // В облаке каждое обновление — запись всей базы. Пишем не чаще раза в минуту,
+  // этого достаточно, чтобы собеседники видели статус «в сети».
+  if (!Number.isFinite(previous) || Date.now() - previous > 60000) save();
   return user;
 }
 
@@ -707,6 +730,7 @@ async function handleApi(req, res, url, pathname) {
       appName: String(cfg('APP_NAME', 'appName', 'Security')),
       authMode: 'both',
       betaMode: BETA_MODE,
+      cloud: store.isCloud,
     });
   }
 
@@ -771,8 +795,7 @@ async function handleApi(req, res, url, pathname) {
       return sendError(res, 400, 'not_image');
     }
 
-    const filePath = path.join(AVATARS_DIR, `${me.id}.bin`);
-    await fs.promises.writeFile(filePath, buf);
+    await store.writeStoredFile(`avatars/${me.id}.bin`, buf);
 
     const now = nowIso();
     me.avatar = { mime, size: buf.length, updatedAt: now };
@@ -790,13 +813,8 @@ async function handleApi(req, res, url, pathname) {
     const userId = match[1];
     const user = db.users[userId];
     if (!user || !user.avatar) return sendError(res, 404, 'avatar_not_found');
-    const filePath = path.join(AVATARS_DIR, `${userId}.bin`);
-    let data;
-    try {
-      data = await fs.promises.readFile(filePath);
-    } catch {
-      return sendError(res, 404, 'avatar_missing');
-    }
+    const data = await store.readStoredFile(`avatars/${userId}.bin`);
+    if (!data) return sendError(res, 404, 'avatar_missing');
     res.writeHead(200, {
       'Content-Type': user.avatar.mime,
       'Content-Length': data.length,
@@ -965,12 +983,78 @@ async function handleApi(req, res, url, pathname) {
 
   /* ---------- файлы ---------- */
 
+  if (pathname === '/api/files/ticket' && method === 'POST') {
+    if (!store.isCloud) return sendError(res, 400, 'cloud_only');
+    const body = await readJson(req);
+    const declared = Number(body.size);
+    if (!Number.isFinite(declared) || declared < 1 || declared > FILE_LIMIT) {
+      return sendError(res, 400, 'bad_size');
+    }
+    const fileId = id('f_');
+    const pathname = `files/${fileId}.bin`;
+    try {
+      const { issueSignedToken, presignUrl } = require('@vercel/blob');
+      const signed = await issueSignedToken({
+        pathname,
+        operations: ['put'],
+        validUntil: Date.now() + 10 * 60 * 1000,
+        allowedContentTypes: ['application/octet-stream'],
+        maximumSizeInBytes: FILE_LIMIT,
+      });
+      const { presignedUrl } = await presignUrl(signed, {
+        operation: 'put',
+        pathname,
+        access: 'private',
+        allowedContentTypes: ['application/octet-stream'],
+        maximumSizeInBytes: FILE_LIMIT,
+        addRandomSuffix: false,
+        allowOverwrite: false,
+        cacheControlMaxAge: 60,
+      });
+      return sendJson(res, 200, { fileId, uploadUrl: presignedUrl });
+    } catch (err) {
+      console.error('[files] не удалось выдать ссылку на загрузку:', err);
+      return sendError(res, 503, 'upload_unavailable');
+    }
+  }
+
+  if (pathname === '/api/files/complete' && method === 'POST') {
+    if (!store.isCloud) return sendError(res, 400, 'cloud_only');
+    const body = await readJson(req);
+    const fileId = String(body.fileId || '');
+    if (!/^f_[a-f0-9]{20}$/.test(fileId)) return sendError(res, 400, 'bad_file');
+    if (db.files[fileId]) {
+      if (db.files[fileId].ownerId !== me.id) return sendError(res, 403, 'forbidden');
+      return sendJson(res, 200, { fileId, size: db.files[fileId].size });
+    }
+    try {
+      const { head } = require('@vercel/blob');
+      const meta = await head(`files/${fileId}.bin`, { access: 'private' });
+      if (!meta || !Number.isFinite(meta.size)) return sendError(res, 404, 'file_missing');
+      if (meta.size > FILE_LIMIT) return sendError(res, 413, 'too_large');
+      db.files[fileId] = {
+        id: fileId,
+        ownerId: me.id,
+        chatId: null,
+        size: meta.size,
+        createdAt: nowIso(),
+      };
+      save();
+      return sendJson(res, 200, { fileId, size: meta.size });
+    } catch (err) {
+      if (err && (err.name === 'BlobNotFoundError' || err.statusCode === 404)) {
+        return sendError(res, 404, 'file_missing');
+      }
+      console.error('[files] не удалось подтвердить загрузку:', err);
+      return sendError(res, 503, 'upload_unavailable');
+    }
+  }
+
   if (pathname === '/api/files' && method === 'POST') {
     const buf = await readBody(req, FILE_LIMIT);
     if (!buf.length) return sendError(res, 400, 'empty_file');
     const fileId = id('f_');
-    const filePath = path.join(FILES_DIR, `${fileId}.bin`);
-    await fs.promises.writeFile(filePath, buf);
+    await store.writeStoredFile(`files/${fileId}.bin`, buf);
     db.files[fileId] = {
       id: fileId,
       ownerId: me.id,
@@ -989,19 +1073,30 @@ async function handleApi(req, res, url, pathname) {
     const allowed =
       file.ownerId === me.id || (file.chatId && isMember(chatOf(file.chatId), me.id));
     if (!allowed) return sendError(res, 403, 'forbidden');
-    const filePath = path.join(FILES_DIR, `${file.id}.bin`);
-    let data;
-    try {
-      data = await fs.promises.readFile(filePath);
-    } catch {
-      return sendError(res, 404, 'file_missing');
-    }
-    res.writeHead(200, {
+    const opened = await store.openStoredFile(`files/${file.id}.bin`);
+    if (!opened) return sendError(res, 404, 'file_missing');
+    const headers = {
       'Content-Type': 'application/octet-stream',
-      'Content-Length': data.length,
       'Cache-Control': 'private, max-age=31536000, immutable',
+    };
+    if (Number.isFinite(opened.size)) headers['Content-Length'] = opened.size;
+    res.writeHead(200, headers);
+    opened.stream.on('error', () => {
+      try {
+        res.destroy();
+      } catch {
+        /* поток уже закрыт */
+      }
     });
-    return res.end(data);
+    res.on('close', () => {
+      try {
+        opened.stream.destroy();
+      } catch {
+        /* поток уже закрыт */
+      }
+    });
+    opened.stream.pipe(res);
+    return undefined;
   }
 
   /* ---------- звонки (сигнализация) ---------- */
@@ -1015,6 +1110,9 @@ async function handleApi(req, res, url, pathname) {
     if (!call || typeof call !== 'object' || !['offer', 'answer', 'ice', 'end', 'reject', 'busy'].includes(call.type)) {
       return sendError(res, 400, 'bad_call');
     }
+    if (call.type === 'offer' && !realtime.isOnline(target.id)) {
+      return sendJson(res, 200, { ok: true, delivered: false });
+    }
     const delivered = realtime.send(target.id, 'call', {
       from: publicUser(me),
       call,
@@ -1025,7 +1123,32 @@ async function handleApi(req, res, url, pathname) {
 
   /* ---------- поток событий ---------- */
 
+  if (pathname === '/api/events/poll' && method === 'GET') {
+    const init = url.searchParams.get('init') === '1';
+    const since = Math.max(0, Number(url.searchParams.get('since') || 0) || 0);
+    const live = new Set(realtime.onlineUsers());
+    const events = (db.events || [])
+      .filter((event) => event.to === me.id && event.seq > since)
+      .slice(-100)
+      .map((event) => ({
+        seq: event.seq,
+        type: event.type,
+        data: event.data,
+        at: event.at,
+      }));
+    const cursor = init
+      ? (db.meta.eventSeq || 0)
+      : (events.length ? events[events.length - 1].seq : since);
+    return sendJson(res, 200, {
+      events: init ? [] : events,
+      cursor,
+      online: Array.from(live),
+      serverTime: nowIso(),
+    });
+  }
+
   if (pathname === '/api/events' && method === 'GET') {
+    if (store.isCloud) return sendError(res, 410, 'use_events_poll');
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',

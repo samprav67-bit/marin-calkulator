@@ -26,6 +26,7 @@
     "@yao-pkg/pkg": "^6.5.0"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "@vercel/blob": "^2.8.2"
   }
 }

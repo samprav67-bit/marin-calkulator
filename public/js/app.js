@@ -21,10 +21,13 @@ const state = {
   hasMore: false,
   loadingOlder: false,
   sending: false,
+  cloud: false,
   search: '',
   events: null,
+  eventCursor: null,
   everReady: false,
   reconnectTimer: null,
+  pollBusy: false,
   typingSentAt: 0,
   typingHideTimer: null,
   audioCache: new Map(),
@@ -464,72 +467,98 @@ function connectEvents() {
   }
   clearTimeout(state.reconnectTimer);
 
-  const source = new EventSource(`/api/events?token=${encodeURIComponent(api.token)}`);
-  state.events = source;
-
-  const parse = (event) => {
-    try {
-      return JSON.parse(event.data);
-    } catch {
-      return null;
-    }
+  const poll = {
+    closed: false,
+    close() {
+      this.closed = true;
+      clearTimeout(state.reconnectTimer);
+      if (state.events === this) state.events = null;
+    },
   };
+  state.events = poll;
+  state.eventCursor = null;
+  state.everReady = false;
+  state.pollBusy = false;
 
-  source.addEventListener('ready', async (event) => {
-    const data = parse(event);
-    if (!data) return;
-    state.online = new Set(data.online || []);
-    renderChatList();
-    if (state.activeId) renderHeader();
-
-    // После переподключения события могли потеряться — досинхронизируемся.
-    if (state.everReady) {
-      await loadChats();
-      if (state.activeId) await loadMessages(state.activeId);
-    }
-    state.everReady = true;
-  });
-
-  source.onerror = () => {
-    if (state.events !== source) return;
-    try {
-      source.close();
-    } catch {
-      /* игнорируем */
-    }
-    state.events = null;
+  const schedule = (delay) => {
+    if (poll.closed || state.events !== poll) return;
     clearTimeout(state.reconnectTimer);
-    state.reconnectTimer = setTimeout(() => {
-      if (state.me) connectEvents();
-    }, 2500);
+    state.reconnectTimer = setTimeout(tick, delay);
   };
 
-  source.addEventListener('presence', (event) => {
-    const data = parse(event);
-    if (!data) return;
+  const tick = async () => {
+    if (poll.closed || state.events !== poll || !state.me) return;
+    if (state.pollBusy) {
+      schedule(800);
+      return;
+    }
+    state.pollBusy = true;
+    try {
+      const path = state.eventCursor == null
+        ? '/events/poll?init=1'
+        : `/events/poll?since=${state.eventCursor}`;
+      const res = await api.get(path);
+      if (poll.closed || state.events !== poll) return;
+
+      state.eventCursor = res.cursor;
+      state.online = new Set(res.online || []);
+      renderChatList();
+      if (state.activeId) renderHeader();
+
+      // Первый ответ: забираем актуальный список чатов и историю.
+      if (!state.everReady) {
+        state.everReady = true;
+        await loadChats();
+        if (state.activeId) await loadMessages(state.activeId);
+      }
+
+      for (const item of res.events || []) {
+        if (poll.closed) break;
+        await onRealtimeEvent(item.type, item.data);
+      }
+
+      // Журнал ограничен, поэтому при переполнении дочитываем состояние целиком.
+      if ((res.events || []).length >= 100) await syncFromServer();
+    } catch {
+      /* сеть недоступна — следующий тик повторит */
+    } finally {
+      state.pollBusy = false;
+      if (poll.closed || state.events !== poll) return;
+      let delay = document.visibilityState === 'hidden' ? 9000 : 3500;
+      if (calls.busy) delay = 1200;
+      schedule(delay);
+    }
+  };
+
+  tick();
+}
+
+async function onRealtimeEvent(type, data) {
+  if (!data) return;
+
+  if (type === 'presence') {
     if (data.online) state.online.add(data.userId);
     else state.online.delete(data.userId);
     renderChatList();
     if (state.activeId) renderHeader();
-  });
+    return;
+  }
 
-  source.addEventListener('message', (event) => {
-    const data = parse(event);
-    if (data && data.message) onIncomingMessage(data.message);
-  });
+  if (type === 'message') {
+    if (data.message) onIncomingMessage(data.message);
+    return;
+  }
 
-  source.addEventListener('read', (event) => {
-    const data = parse(event);
-    if (!data) return;
+  if (type === 'read') {
     const chat = state.chatMap.get(data.chatId);
     if (!chat) return;
     chat.peerLastRead = data.upTo;
     if (state.activeId === data.chatId) refreshTicks();
-  });
+    return;
+  }
 
-  source.addEventListener('typing', (event) => {
-    const data = parse(event);
-    if (!data || data.chatId !== state.activeId) return;
+  if (type === 'typing') {
+    if (data.chatId !== state.activeId) return;
     const typing = $('typing');
     typing.hidden = false;
     clearTimeout(state.typingHideTimer);
@@ -538,16 +567,16 @@ function connectEvents() {
     }, 3500);
     const el = $('messages');
     if (nearBottom()) el.scrollTop = el.scrollHeight;
-  });
+    return;
+  }
 
-  source.addEventListener('call', (event) => {
-    const data = parse(event);
-    if (data && data.call) calls.handleSignal(data);
-  });
+  if (type === 'call') {
+    if (data.call) await calls.handleSignal(data);
+    return;
+  }
 
-  source.addEventListener('keychange', async (event) => {
-    const data = parse(event);
-    const peerId = data && data.userId;
+  if (type === 'keychange') {
+    const peerId = data.userId;
     const known = state.chats.find((chat) => chat.peer && chat.peer.id === peerId);
     const hadKey = !!(known && known.peer && known.peer.publicKey);
     await loadChats();
@@ -556,11 +585,11 @@ function connectEvents() {
     } else {
       ui.toast('Собеседник подключил шифрование', 'info');
     }
-  });
+    return;
+  }
 
-  source.addEventListener('profile', (event) => {
-    const data = parse(event);
-    if (!data || !data.user) return;
+  if (type === 'profile') {
+    if (!data.user) return;
     for (const chat of state.chats) {
       if (chat.peer && chat.peer.id === data.user.id) {
         chat.peer = { ...chat.peer, ...data.user, online: chat.peer.online };
@@ -568,7 +597,7 @@ function connectEvents() {
     }
     renderChatList();
     if (state.activeId) renderHeader();
-  });
+  }
 }
 
 /* ================================ Чаты ================================ */
@@ -1263,6 +1292,29 @@ async function sendText() {
   }
 }
 
+async function uploadEncryptedFile(bytes) {
+  if (!state.cloud) {
+    const { fileId } = await api.raw('/files', bytes);
+    return fileId;
+  }
+
+  // В облаке тело запроса к Vercel Function ограничено 4.5 МБ, поэтому
+  // шифротекст уходит напрямую в приватный Vercel Blob по подписанной ссылке.
+  const ticket = await api.post('/files/ticket', { size: bytes.byteLength });
+  const response = await fetch(ticket.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'x-vercel-blob-access': 'private',
+      'x-content-type': 'application/octet-stream',
+    },
+    body: bytes,
+  });
+  if (!response.ok) throw new Error('upload_failed');
+  const done = await api.post('/files/complete', { fileId: ticket.fileId });
+  if (!done || !done.fileId) throw new Error('upload_failed');
+  return done.fileId;
+}
+
 async function sendFile(file) {
   const chat = chatOfActive();
   if (!chat || !chat.peer || !chat.peer.publicKey) return;
@@ -1275,7 +1327,7 @@ async function sendFile(file) {
   try {
     const buffer = await file.arrayBuffer();
     const encrypted = await crypto.encryptBytes(buffer);
-    const { fileId } = await api.raw('/files', encrypted.data);
+    const fileId = await uploadEncryptedFile(encrypted.data);
     await sendMessage(
       chat,
       'file',
@@ -1382,7 +1434,7 @@ async function finishRecording(send) {
     const blob = new Blob(session.chunks, { type: session.mime.split(';')[0] });
     const buffer = await blob.arrayBuffer();
     const encrypted = await crypto.encryptBytes(buffer);
-    const { fileId } = await api.raw('/files', encrypted.data);
+    const fileId = await uploadEncryptedFile(encrypted.data);
     await sendMessage(
       chat,
       'voice',
@@ -1933,15 +1985,10 @@ function bindApp() {
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.activeId) markRead(state.activeId);
-  });
-
-  // Страховка на случай, если поток SSE оборвался и не восстановился.
-  setInterval(() => {
-    if (!state.me) return;
-    if (state.events && state.events.readyState === EventSource.OPEN) return;
+    if (document.visibilityState !== 'visible' || !state.me) return;
+    if (state.activeId) markRead(state.activeId);
     syncFromServer();
-  }, 12000);
+  });
 }
 
 function maybeTyping() {
@@ -1965,6 +2012,7 @@ async function boot() {
   try {
     const cfg = await api.get('/config').catch(() => ({ appName: 'Security' }));
     betaMode = !!cfg.betaMode;
+    state.cloud = !!cfg.cloud;
     applyBranding(cfg.appName);
     applyAuthMode(cfg.authMode, betaMode);
   } catch {

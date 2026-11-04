@@ -1,5 +1,7 @@
 'use strict';
 
+import { getToken } from './api.js';
+
 export const $ = (id) => document.getElementById(id);
 
 export function icon(name, cls = 'icon') {
@@ -42,7 +44,10 @@ export function paintAvatar(el, user, { online = false, showPresence = false } =
   const hasImage = user && user.avatarUrl;
   if (hasImage) {
     const img = document.createElement('img');
-    img.src = user.avatarUrl;
+    const token = getToken();
+    img.src = token
+      ? `${user.avatarUrl}${user.avatarUrl.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`
+      : user.avatarUrl;
     img.alt = '';
     img.style.width = '100%';
     img.style.height = '100%';
